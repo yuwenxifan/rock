@@ -240,6 +240,10 @@ export const useAnalysisStore = defineStore('analysis', () => {
     cell.status = (newName && newQuantity != null) ? 'success' : 'failed'
 
     await _revalidateResult(stage, result)
+
+    // 触发 canvas 重绘（修改嵌套属性不会触发 watch，需替换引用）
+    if (stage === 'before') beforeResult.value = { ...beforeResult.value }
+    else afterResult.value = { ...afterResult.value }
   }
 
   // ── 排除已识别物品 ──
@@ -258,6 +262,10 @@ export const useAnalysisStore = defineStore('analysis', () => {
     cell.status = 'ignored'
 
     await _revalidateResult(stage, result)
+
+    // 触发 canvas 重绘（修改嵌套属性不会触发 watch，需替换引用）
+    if (stage === 'before') beforeResult.value = { ...beforeResult.value }
+    else afterResult.value = { ...afterResult.value }
   }
 
   return {
