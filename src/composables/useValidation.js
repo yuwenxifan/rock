@@ -11,6 +11,7 @@ export function validateStage(recognized, stageLabel = '') {
   const warnings = []
   const errors = []
   const conflictDetails = []
+  const discarded = []
 
   for (const entry of recognized) {
     if (!entry.itemName || entry.quantity == null) continue
@@ -38,8 +39,11 @@ export function validateStage(recognized, stageLabel = '') {
         // 取 histDistance 最小的（最相似），无 histDistance 时取第一条
         group.sort((a, b) => (a.histDistance ?? 1) - (b.histDistance ?? 1))
         const kept = group[0]
-        const discarded = group.slice(1)
-        const discardedInfo = discarded
+        const dropped = group.slice(1)
+        for (const d of dropped) {
+          discarded.push({ screenshotIndex: si, row: d.row, col: d.col, itemName })
+        }
+        const discardedInfo = dropped
           .map((d) => `[${d.row},${d.col}]`)
           .join('、')
         warnings.push(
@@ -79,7 +83,7 @@ export function validateStage(recognized, stageLabel = '') {
     totals[itemName] = quantities[0]
   }
 
-  return { totals, errors, warnings, conflictDetails }
+  return { totals, errors, warnings, conflictDetails, discarded }
 }
 
 /**

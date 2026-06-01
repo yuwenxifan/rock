@@ -200,7 +200,20 @@ export const useAnalysisStore = defineStore('analysis', () => {
       }
     }
 
-    const { totals, errors, warnings, conflictDetails } = validateStage(recognized, stage === 'before' ? '跑图前' : '跑图后')
+    const { totals, errors, warnings, conflictDetails, discarded } = validateStage(recognized, stage === 'before' ? '跑图前' : '跑图后')
+
+    // 清除被 dedup 丢弃的 cell
+    for (const d of discarded) {
+      const ss = result.screenshotDebug.find((s) => s.index === d.screenshotIndex)
+      if (!ss) continue
+      const cell = ss.cells.find((c) => c.row === d.row && c.col === d.col)
+      if (cell) {
+        cell.itemName = null
+        cell.quantity = null
+        cell.status = 'ignored'
+      }
+    }
+
     result.totals = totals
     result.errors = errors
     result.warnings = [...(result.warnings?.filter((w) => !w.includes('重复匹配')) || []), ...warnings]

@@ -2,8 +2,8 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 
-export default defineConfig({
-  base: '/rock/',
+export default defineConfig(({ mode }) => ({
+  base: mode === 'production' ? '/rock/' : '/',
   build: { outDir: 'docs' },
   plugins: [vue()],
   resolve: {
@@ -11,4 +11,4 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-})
+}))

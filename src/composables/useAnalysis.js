@@ -154,7 +154,19 @@ export async function analyzeStage(files, onProgress, stageLabel = '') {
     }
   }
 
-  const { totals, errors, warnings, conflictDetails } = validateStage(validRecognized, stageLabel)
+  const { totals, errors, warnings, conflictDetails, discarded } = validateStage(validRecognized, stageLabel)
+
+  // 清除被 dedup 丢弃的 cell，避免 canvas 上仍显示两个识别结果
+  for (const d of discarded) {
+    const ss = screenshotDebug.find((s) => s.index === d.screenshotIndex)
+    if (!ss) continue
+    const cell = ss.cells.find((c) => c.row === d.row && c.col === d.col)
+    if (cell) {
+      cell.itemName = null
+      cell.quantity = null
+      cell.status = 'ignored'
+    }
+  }
   stageWarnings.push(...warnings)
 
   return {
