@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { Warning } from '@element-plus/icons-vue'
 import { useAnalysisStore } from './stores/analysis.js'
 import UploadSection from './components/UploadSection.vue'
 import ResultPanel from './components/ResultPanel.vue'
@@ -36,6 +37,14 @@ function jumpToAnnotation(stage, index) {
   handleSelect(stage, index)
   activeTab.value = 'annotate'
 }
+
+const generalWarnings = computed(() =>
+  store.warnings.filter((w) => !w.includes('低置信度')),
+)
+const lowConfWarnings = computed(() =>
+  store.warnings.filter((w) => w.includes('低置信度')),
+)
+const lowConfDialog = ref(false)
 </script>
 
 <template>
@@ -96,9 +105,9 @@ function jumpToAnnotation(stage, index) {
       />
     </section>
 
-    <section v-if="store.warnings.length" class="alerts">
+    <section v-if="generalWarnings.length" class="alerts">
       <el-alert
-        v-for="(warn, i) in store.warnings"
+        v-for="(warn, i) in generalWarnings"
         :key="'w' + i"
         :title="warn"
         type="warning"
@@ -107,6 +116,23 @@ function jumpToAnnotation(stage, index) {
         style="margin-bottom: 8px"
       />
     </section>
+
+    <span v-if="lowConfWarnings.length" class="low-conf-icon" @click="lowConfDialog = true">
+      <el-icon :size="18"><Warning /></el-icon>
+      <span class="low-conf-count">{{ lowConfWarnings.length }}</span>
+    </span>
+
+    <el-dialog v-model="lowConfDialog" title="低置信度匹配提醒" width="560px" :close-on-click-modal="false">
+      <el-alert
+        v-for="(w, i) in lowConfWarnings"
+        :key="'lc' + i"
+        :title="w"
+        type="warning"
+        show-icon
+        :closable="false"
+        style="margin-bottom: 8px"
+      />
+    </el-dialog>
 
     <el-tabs v-if="store.beforeResult || store.afterResult" v-model="activeTab" class="result-tabs">
       <el-tab-pane label="统计结果" name="result">
@@ -220,6 +246,25 @@ body {
 
 .alerts {
   margin-bottom: 12px;
+}
+
+.low-conf-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #e6a23c;
+  cursor: pointer;
+  margin-bottom: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.low-conf-icon:hover {
+  background: #fdf6ec;
+}
+
+.low-conf-count {
+  font-size: 13px;
 }
 
 .result-tabs {
