@@ -26,14 +26,14 @@ export function clearConfigCache() {
 /** @returns {Promise<{ items: ItemConfig[], settings: AppSettings }>} */
 export async function loadConfig(force = false) {
   if (cachedConfig && !force) return cachedConfig
-  const res = await fetch('/config/items.json')
+  const res = await fetch(import.meta.env.BASE_URL + 'config/items.json')
   if (!res.ok) throw new Error('无法加载物品配置')
   cachedConfig = await res.json()
   return cachedConfig
 }
 
 export function getImageUrl(filename) {
-  return `/config/images/${filename}`
+  return import.meta.env.BASE_URL + `config/images/${filename}`
 }
 
 export { BALL_ORDER, CATEGORY_ORDER }
