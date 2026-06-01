@@ -266,20 +266,23 @@ export function matchCellIcon(iconImageData, refHashes, settings = {}) {
     const second = candidates.length > 1 ? candidates[1] : null
     const gap = second ? best.histScore - second.histScore : 1.0
 
-    if (best.histScore >= histStrong && gap >= confidenceGap) {
+    const highConfidence = best.histScore >= 0.88
+    const minGap = highConfidence ? Math.min(confidenceGap, 0.015) : confidenceGap
+
+    if (best.histScore >= histStrong && gap >= minGap) {
       match = best.name
       distance = best.distance
-      ambiguous = second && gap < 0.03
+      ambiguous = highConfidence && gap < confidenceGap
       if (ambiguous && second) {
         console.warn(
-          `[图像识别] 低置信度 (gap过小): "${best.name}" hist=${best.histScore.toFixed(3)} gap=${gap.toFixed(3)}`,
+          `[图像识别] 低置信度 (gap过小, hist高放宽): "${best.name}" hist=${best.histScore.toFixed(3)} gap=${gap.toFixed(3)}`,
           `| 2nd: ${second.name}(${second.histScore.toFixed(3)})`,
         )
       }
     } else if (best.histScore >= 0.80) {
       console.warn(
         `[图像识别] 拒识 (低于阈值): "${best.name}" hist=${best.histScore.toFixed(3)} gap=${gap.toFixed(3)}`,
-        `| 需 hist≥${histStrong} gap≥${confidenceGap}`,
+        `| 需 hist>=${histStrong} gap>=${minGap}`,
         `| 2nd: ${second ? second.name + '(' + second.histScore.toFixed(3) + ')' : 'none'}`,
       )
     }
