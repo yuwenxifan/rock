@@ -1,6 +1,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 
+const BASE = import.meta.env.BASE_URL
+
 const props = defineProps({
   beforeResult: { type: Object, default: null },
   afterResult: { type: Object, default: null },
@@ -215,7 +217,7 @@ function drawSegmentOverlay(canvas, cell) {
                 <div class="match-chars">
                   <canvas :ref="(el) => { if (el && cell.ocrImageDataUrl) drawCharCanvas(el, cell, ci) }" class="match-char-img" />
                   <span class="match-arrow">→</span>
-                  <img :src="'/config/chars/' + r.ch + '.png'" class="match-tpl-img match-best" style="height:50px;width:auto" />
+                  <img :src="BASE + 'config/chars/' + r.ch + '.png'" class="match-tpl-img match-best" style="height:50px;width:auto" />
                 </div>
               </div>
             </div>

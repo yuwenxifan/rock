@@ -48,7 +48,7 @@ async function loadRealTemplates() {
   try {
     const map = new Map()
     for (const ch of CHAR_SET) {
-      const tpl = await loadTemplateImage(`/config/chars/${ch}.png`)
+      const tpl = await loadTemplateImage(import.meta.env.BASE_URL + `config/chars/${ch}.png`)
       map.set(ch, tpl)
     }
     realTemplates = map
