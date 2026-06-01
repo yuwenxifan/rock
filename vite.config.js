@@ -4,6 +4,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   base: '/rock/',
+  build: { outDir: 'docs' },
   plugins: [vue()],
   resolve: {
     alias: {
