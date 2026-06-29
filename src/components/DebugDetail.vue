@@ -27,6 +27,35 @@ function getOcrCells(result) {
   return cells
 }
 
+// ── 按截图+行分组 OCR 格子（用于 6 列背包布局）──
+function groupOcrByRow(result) {
+  const cells = getOcrCells(result)
+  const byScreenshot = new Map()
+  for (const c of cells) {
+    const key = c.screenshotIndex
+    if (!byScreenshot.has(key)) byScreenshot.set(key, [])
+    byScreenshot.get(key).push(c)
+  }
+  const groups = []
+  for (const [si, list] of byScreenshot) {
+    const byRow = new Map()
+    for (const c of list) {
+      const rk = c.row
+      if (!byRow.has(rk)) byRow.set(rk, [])
+      byRow.get(rk).push(c)
+    }
+    const rows = []
+    for (const [ri, rowCells] of byRow) {
+      rowCells.sort((a, b) => a.col - b.col)
+      rows.push({ rowIndex: ri, cells: rowCells })
+    }
+    rows.sort((a, b) => a.rowIndex - b.rowIndex)
+    groups.push({ screenshotIndex: si, rows })
+  }
+  groups.sort((a, b) => a.screenshotIndex - b.screenshotIndex)
+  return groups
+}
+
 // ── 收集有 OCR 调试信息的格子 ──
 function getOcrDebugCells(result) {
   const debug = result?.screenshotDebug
@@ -154,21 +183,26 @@ function drawSegmentOverlay(canvas, cell) {
           <!-- OCR 预处理图像 -->
           <div v-if="getOcrCells(result.data).length" class="ocr-gallery">
             <h4>OCR 预处理图像（放大 + 二值化翻转后，OCR实际使用的）</h4>
-            <div class="ocr-grid">
-              <div
-                v-for="cell in getOcrCells(result.data)"
-                :key="`${cell.screenshotIndex}-${cell.row}-${cell.col}`"
-                class="ocr-cell"
-                :class="{ 'ocr-success': cell.status === 'success', 'ocr-failed': cell.status === 'failed' }"
-              >
-                <img :src="cell.ocrImageDataUrl" class="ocr-img" :title="`截图${cell.screenshotIndex + 1} [${cell.row},${cell.col}]`" />
-                <div class="ocr-label">
-                  <span class="ocr-pos">{{ cell.itemName || '?' }}</span>
-                  <span class="ocr-result">
-                    识别: <strong>x{{ cell.quantity ?? '?' }}</strong>
-                    <span class="ocr-conf">({{ cell.ocrConfidence }}%)</span>
-                  </span>
-                  <span class="ocr-pos">[{{ cell.row }},{{ cell.col }}]</span>
+            <div v-for="group in groupOcrByRow(result.data)" :key="'ss-' + group.screenshotIndex" class="ocr-screenshot-block">
+              <div class="ocr-ss-label">截图 {{ group.screenshotIndex + 1 }}</div>
+              <div v-for="row in group.rows" :key="'r-' + group.screenshotIndex + '-' + row.rowIndex" class="ocr-row-block">
+                <div class="ocr-row-label">行 {{ row.rowIndex }}</div>
+                <div class="ocr-grid">
+                  <div
+                    v-for="cell in row.cells"
+                    :key="`${cell.screenshotIndex}-${cell.row}-${cell.col}`"
+                    class="ocr-cell"
+                    :class="{ 'ocr-success': cell.status === 'success', 'ocr-failed': cell.status === 'failed' }"
+                  >
+                    <img :src="cell.ocrImageDataUrl" class="ocr-img" />
+                    <div class="ocr-label">
+                      <span v-if="cell.itemName" class="ocr-name">{{ cell.itemName }}</span>
+                      <span v-else class="ocr-name ocr-unknown">?</span>
+                      <span class="ocr-result">x{{ cell.quantity ?? '?' }}</span>
+                      <span class="ocr-conf">({{ cell.ocrConfidence }}%)</span>
+                    </div>
+                    <div class="ocr-col">col {{ cell.col }}</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -265,16 +299,42 @@ function drawSegmentOverlay(canvas, cell) {
   color: #303133;
 }
 
+.ocr-screenshot-block {
+  margin-bottom: 14px;
+}
+
+.ocr-ss-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #409eff;
+  margin-bottom: 8px;
+  padding-left: 2px;
+}
+
+.ocr-row-block {
+  margin-bottom: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ocr-row-label {
+  font-size: 10px;
+  color: #909399;
+  margin-bottom: 3px;
+  padding-left: 2px;
+}
+
 .ocr-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(80px, 1fr));
+  gap: 4px;
+  min-width: 520px;
 }
 
 .ocr-cell {
-  border: 2px solid #dcdfe6;
-  border-radius: 6px;
-  padding: 6px;
+  border: 1.5px solid #dcdfe6;
+  border-radius: 4px;
+  padding: 4px;
   background: #fafafa;
   text-align: center;
 }
@@ -285,24 +345,32 @@ function drawSegmentOverlay(canvas, cell) {
 .ocr-img {
   display: block;
   image-rendering: pixelated;
-  height: 40px;
+  height: 30px;
   width: auto;
+  margin: 0 auto;
 }
 
 .ocr-label {
-  margin-top: 4px;
+  margin-top: 2px;
   display: flex;
-  gap: 6px;
-  font-size: 11px;
+  gap: 3px;
+  font-size: 9px;
   color: #606266;
   justify-content: center;
   align-items: center;
   flex-wrap: wrap;
+  line-height: 1.2;
 }
 
-.ocr-label strong { color: #303133; }
-.ocr-conf { color: #909399; font-size: 10px; }
-.ocr-pos { color: #c0c4cc; }
+.ocr-name { color: #303133; font-weight: 500; }
+.ocr-unknown { color: #c0c4cc; }
+.ocr-result { font-weight: 600; font-size: 9px; }
+.ocr-conf { color: #909399; font-size: 8px; }
+.ocr-col {
+  font-size: 8px;
+  color: #c0c4cc;
+  margin-top: 1px;
+}
 
 /* ═══════ 遮罩预览画廊 ═══════ */
 .mask-gallery {

@@ -90,28 +90,36 @@ export function validateStage(recognized, stageLabel = '') {
  * 计算增量结果
  */
 export function computeDelta(beforeTotals, afterTotals, items) {
+  const single = !beforeTotals || !afterTotals
+
   const itemDeltas = items.map((item) => {
-    const before = beforeTotals[item.name] ?? 0
-    const after = afterTotals[item.name] ?? 0
+    const before = beforeTotals?.[item.name] ?? 0
+    const after = afterTotals?.[item.name] ?? 0
     return {
       name: item.name,
       category: item.category,
       ball: item.ball,
-      before,
-      after,
-      delta: after - before,
+      before: beforeTotals ? before : null,
+      after: afterTotals ? after : null,
+      delta: single ? null : after - before,
     }
+  }).filter((d) => {
+    // 单阶段模式：只显示有数量的物品
+    if (single) return (d.before ?? 0) > 0 || (d.after ?? 0) > 0
+    return true
   })
 
   const categorySummary = {}
   for (const d of itemDeltas) {
-    categorySummary[d.category] = (categorySummary[d.category] ?? 0) + d.delta
+    const val = single ? (d.before ?? d.after ?? 0) : d.delta
+    categorySummary[d.category] = (categorySummary[d.category] ?? 0) + val
   }
 
   const ballSummary = {}
   for (const d of itemDeltas) {
-    ballSummary[d.ball] = (ballSummary[d.ball] ?? 0) + d.delta
+    const val = single ? (d.before ?? d.after ?? 0) : d.delta
+    ballSummary[d.ball] = (ballSummary[d.ball] ?? 0) + val
   }
 
-  return { itemDeltas, categorySummary, ballSummary }
+  return { itemDeltas, categorySummary, ballSummary, single }
 }

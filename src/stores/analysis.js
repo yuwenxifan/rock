@@ -29,12 +29,17 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const analyzing = ref(false)
   const progressStep = ref('')
   const progressPercent = ref(0)
+  const persistenceOk = ref(true)
 
   const canAnalyze = computed(
-    () => beforeImages.value.length > 0 && afterImages.value.length > 0 && !analyzing.value,
+    () => (beforeImages.value.length > 0 || afterImages.value.length > 0) && !analyzing.value,
   )
 
-  const hasResults = computed(() => delta.value != null && errors.value.length === 0)
+  const singleStage = computed(
+    () => beforeImages.value.length === 0 || afterImages.value.length === 0,
+  )
+
+  const hasResults = computed(() => (delta.value != null || beforeResult.value?.totals || afterResult.value?.totals) && errors.value.length === 0)
 
   function setProgress(step, percent) {
     const stepInfo = ANALYSIS_STEPS.find((s) => s.key === step)
@@ -49,7 +54,12 @@ export const useAnalysisStore = defineStore('analysis', () => {
     for (let i = 0; i < files.length; i++) {
       const idx = list.value.length
       list.value.push(files[i])
-      await saveImageBlob(stage, idx, files[i])
+      try {
+        await saveImageBlob(stage, idx, files[i])
+      } catch {
+        // 手机端 IndexedDB 配额可能不足，降级为仅内存存储
+        persistenceOk.value = false
+      }
       meta.value.push({
         index: idx,
         name: files[i].name,
@@ -64,12 +74,16 @@ export const useAnalysisStore = defineStore('analysis', () => {
     const list = stage === 'before' ? beforeImages : afterImages
     const meta = stage === 'before' ? beforeMeta : afterMeta
 
-    await deleteImageBlob(stage, index)
+    try { await deleteImageBlob(stage, index) } catch { /* ignore */ }
     list.value.splice(index, 1)
     meta.value.splice(index, 1)
 
     for (let i = 0; i < list.value.length; i++) {
-      await saveImageBlob(stage, i, list.value[i])
+      try {
+        await saveImageBlob(stage, i, list.value[i])
+      } catch {
+        persistenceOk.value = false
+      }
       meta.value[i] = {
         index: i,
         name: list.value[i].name,
@@ -126,20 +140,23 @@ export const useAnalysisStore = defineStore('analysis', () => {
     warnings.value = []
     progressStep.value = ''
     progressPercent.value = 0
-    await clearImageBlobs()
+    persistenceOk.value = true
+    try { await clearImageBlobs() } catch { /* ignore */ }
     clearState()
   }
 
   function persistMeta() {
-    saveState({
-      beforeMeta: beforeMeta.value,
-      afterMeta: afterMeta.value,
-      delta: delta.value,
-      errors: errors.value,
-      warnings: warnings.value,
-      beforeResult: serializeResult(beforeResult.value),
-      afterResult: serializeResult(afterResult.value),
-    })
+    try {
+      saveState({
+        beforeMeta: beforeMeta.value,
+        afterMeta: afterMeta.value,
+        delta: delta.value,
+        errors: errors.value,
+        warnings: warnings.value,
+        beforeResult: serializeResult(beforeResult.value),
+        afterResult: serializeResult(afterResult.value),
+      })
+    } catch { /* localStorage 不可用，静默跳过 */ }
   }
 
   function serializeResult(result) {
@@ -170,8 +187,14 @@ export const useAnalysisStore = defineStore('analysis', () => {
     beforeResult.value = state.beforeResult || null
     afterResult.value = state.afterResult || null
 
-    beforeImages.value = await restoreStageImages('before', beforeMeta.value)
-    afterImages.value = await restoreStageImages('after', afterMeta.value)
+    try {
+      beforeImages.value = await restoreStageImages('before', beforeMeta.value)
+      afterImages.value = await restoreStageImages('after', afterMeta.value)
+    } catch {
+      // IndexedDB 读取失败（浏览器清理了数据等），静默跳过恢复
+      beforeMeta.value = []
+      afterMeta.value = []
+    }
 
     for (const img of [...beforeImages.value, ...afterImages.value]) {
       URL.createObjectURL(img)
@@ -292,6 +315,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     analyzing,
     progressStep,
     progressPercent,
+    persistenceOk,
     canAnalyze,
     hasResults,
     addImages,

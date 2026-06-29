@@ -385,13 +385,18 @@ function segmentCharacters(canvas) {
     } else merged.push(r)
   }
 
+  // x 模板 60×66，在预处理高度 h 中实际字符高度约 h*(66/98)，宽度约 h*(66/98)*(60/66) = h*0.61
+  // 宽度 < 60% 视为噪点：h*0.61*0.6 ≈ h*0.37
+  const noiseWidthThreshold = Math.round(h * 0.37)
+
   return merged.map(r => {
     let bc = 0
     for (let x = r.x; x < r.x + r.w; x++)
       for (let y = 0; y < h; y++)
         if (pixels[(y * w + x) * 4] === 0) bc++
     const density = bc / (r.w * h)
-    return { ...r, density, isNoise: r.w < 4 || density < 0.005 || density > 0.95 }
+    const isNoiseByWidth = r.w < noiseWidthThreshold
+    return { ...r, density, isNoise: isNoiseByWidth || density < 0.005 || density > 0.95 }
   })
 }
 

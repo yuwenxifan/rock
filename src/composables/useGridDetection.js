@@ -70,8 +70,29 @@ export function detectGridCells(imageData, settings) {
   const cells = []
   const skipped = []
 
-  for (const rowGroup of validRows) {
-    const rowY = gridOrigin.y + rowGroup.rowIndex * rowSpacing
+  // 收集需要生成格子的行：原始有效行 + 上下各扩展一行
+  const rowToOrigIdx = new Map()
+  rowGroups.forEach((row, i) => rowToOrigIdx.set(row, i))
+  const keptIndices = validRows.map(r => rowToOrigIdx.get(r.row)).filter(i => i != null).sort((a, b) => a - b)
+
+  /** @type {Array<{ row: Array, rowIndex: number }>} */
+  const rowsToGenerate = validRows.map(r => ({ row: r.row, rowIndex: r.rowIndex }))
+  if (keptIndices.length > 0) {
+    const minI = keptIndices[0]
+    const maxI = keptIndices[keptIndices.length - 1]
+
+    // 上方相邻行
+    if (minI > 0 && rowGroups[minI - 1].length >= 1) {
+      rowsToGenerate.push({ row: rowGroups[minI - 1], rowIndex: -1 })
+    }
+    // 下方相邻行
+    if (maxI < rowGroups.length - 1 && rowGroups[maxI + 1].length >= 1) {
+      rowsToGenerate.push({ row: rowGroups[maxI + 1], rowIndex: validRows.length })
+    }
+  }
+
+  for (const { row, rowIndex } of rowsToGenerate) {
+    const rowY = gridOrigin.y + rowIndex * rowSpacing
 
     for (let col = 0; col < gridColumns; col++) {
       const x = gridOrigin.x + col * colSpacing
@@ -80,7 +101,7 @@ export function detectGridCells(imageData, settings) {
       const rect = { x: Math.round(x), y: Math.round(y), width: template.width, height: template.height }
 
       if (!isCompleteCell(rect, width, height, margin)) {
-        skipped.push({ rect, reason: '格子不完整或被裁切', row: rowGroup.rowIndex, col })
+        skipped.push({ rect, reason: '格子不完整或被裁切', row: rowIndex, col })
         continue
       }
 
@@ -90,7 +111,7 @@ export function detectGridCells(imageData, settings) {
       )
 
       if (!hasBar) {
-        skipped.push({ rect, reason: '未检测到数量条（可能为空位或非物品格）', row: rowGroup.rowIndex, col })
+        skipped.push({ rect, reason: '未检测到数量条（可能为空位或非物品格）', row: rowIndex, col })
         continue
       }
 
@@ -99,7 +120,7 @@ export function detectGridCells(imageData, settings) {
         y: rect.y,
         width: rect.width,
         height: rect.height,
-        row: rowGroup.rowIndex,
+        row: rowIndex,
         col,
         cx: rect.x + rect.width / 2,
         cy: rect.y + rect.height / 2,

@@ -45,6 +45,7 @@ const lowConfWarnings = computed(() =>
   store.warnings.filter((w) => w.includes('低置信度')),
 )
 const lowConfDialog = ref(false)
+const warnDialog = ref(false)
 </script>
 
 <template>
@@ -93,6 +94,16 @@ const lowConfDialog = ref(false)
       <el-progress :percentage="store.progressPercent" :stroke-width="16" striped striped-flow />
     </section>
 
+    <section v-if="!store.persistenceOk" class="alerts">
+      <el-alert
+        title="浏览器存储空间不足，截图仅保存在内存中，刷新页面后需重新上传"
+        type="info"
+        show-icon
+        :closable="false"
+        style="margin-bottom: 8px"
+      />
+    </section>
+
     <section v-if="store.errors.length" class="alerts">
       <el-alert
         v-for="(err, i) in store.errors"
@@ -105,22 +116,28 @@ const lowConfDialog = ref(false)
       />
     </section>
 
-    <section v-if="generalWarnings.length" class="alerts">
+    <div v-if="generalWarnings.length || lowConfWarnings.length" class="warn-bar">
+      <span v-if="generalWarnings.length" class="warn-tag" @click="warnDialog = true">
+        <el-icon :size="14"><Warning /></el-icon>
+        <span>{{ generalWarnings.length }} 条提醒</span>
+      </span>
+      <span v-if="lowConfWarnings.length" class="warn-tag warn-tag--low" @click="lowConfDialog = true">
+        <el-icon :size="14"><Warning /></el-icon>
+        <span>{{ lowConfWarnings.length }} 条低置信度</span>
+      </span>
+    </div>
+
+    <el-dialog v-model="warnDialog" title="提醒明细" width="560px" :close-on-click-modal="false">
       <el-alert
-        v-for="(warn, i) in generalWarnings"
-        :key="'w' + i"
-        :title="warn"
+        v-for="(w, i) in generalWarnings"
+        :key="'gw' + i"
+        :title="w"
         type="warning"
         show-icon
         :closable="false"
         style="margin-bottom: 8px"
       />
-    </section>
-
-    <span v-if="lowConfWarnings.length" class="low-conf-icon" @click="lowConfDialog = true">
-      <el-icon :size="18"><Warning /></el-icon>
-      <span class="low-conf-count">{{ lowConfWarnings.length }}</span>
-    </span>
+    </el-dialog>
 
     <el-dialog v-model="lowConfDialog" title="低置信度匹配提醒" width="560px" :close-on-click-modal="false">
       <el-alert
@@ -248,23 +265,38 @@ body {
   margin-bottom: 12px;
 }
 
-.low-conf-icon {
+.warn-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.warn-tag {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   color: #e6a23c;
   cursor: pointer;
-  margin-bottom: 12px;
-  padding: 2px 6px;
+  padding: 3px 10px;
   border-radius: 4px;
-}
-
-.low-conf-icon:hover {
+  font-size: 12px;
   background: #fdf6ec;
+  border: 1px solid #faecd8;
 }
 
-.low-conf-count {
-  font-size: 13px;
+.warn-tag:hover {
+  background: #faecd8;
+}
+
+.warn-tag--low {
+  color: #909399;
+  background: #f5f7fa;
+  border-color: #e4e7ed;
+}
+
+.warn-tag--low:hover {
+  background: #e9ecef;
 }
 
 .result-tabs {

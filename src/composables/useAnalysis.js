@@ -22,17 +22,23 @@ async function analyzeScreenshot(file, screenshotIndex, refHashes, settings, ite
     const maskPreview = renderMaskPreview(iconRegion, settings)
 
     if (!matchResult.match) {
+      // 即使匹配失败也跑 OCR，并保留候选列表供后续兜底填充
+      const { quantity, rawText, confidence, ocrImageDataUrl, _debug } = await recognizeQuantity(quantityRegion)
       cellResults.push({
         screenshotIndex,
         row: cell.row,
         col: cell.col,
         rect: { x: cell.x, y: cell.y, width: cell.width, height: cell.height },
         itemName: null,
-        quantity: null,
+        quantity,
+        ocrConfidence: confidence,
+        ocrImageDataUrl,
+        ocrDebug: _debug || null,
         warnings: [],
         skipped: false,
         hasMarker: cell.hasMarker,
         maskPreview,
+        _candidates: matchResult.candidates,
         status: 'ignored',
       })
       continue
@@ -92,7 +98,51 @@ async function analyzeScreenshot(file, screenshotIndex, refHashes, settings, ite
     })
   }
 
+  // ── 兜底填充：相邻格均识别成功 → 该格也应纳入统计 ──
+  fillGapCells(cellResults, screenshotIndex, stageLabel)
+
   return { cellResults, imageData, imageUrl: img.src, width: img.width, height: img.height }
+}
+
+/**
+ * 兜底填充：如果 ignored 格子的左右相邻格均识别成功，
+ * 则选取置信度最高且未被同截图其他格子使用的候选物品补入。
+ */
+function fillGapCells(cellResults, screenshotIndex, stageLabel) {
+  const cellMap = new Map()
+  for (const c of cellResults) {
+    if (!c.skipped && c.row >= 0 && c.col >= 0) {
+      cellMap.set(`${c.row},${c.col}`, c)
+    }
+  }
+
+  const usedItems = new Set(
+    cellResults.filter((c) => c.itemName && c.status === 'success').map((c) => c.itemName),
+  )
+
+  for (const cell of cellResults) {
+    if (cell.status !== 'ignored' || cell.skipped) continue
+    const candidates = cell._candidates
+    if (!candidates || candidates.length === 0) continue
+
+    const left = cellMap.get(`${cell.row},${cell.col - 1}`)
+    const right = cellMap.get(`${cell.row},${cell.col + 1}`)
+    if (!left || !right) continue
+    if (left.status !== 'success' || right.status !== 'success') continue
+
+    // 选置信度最高且未被同截图其他格子使用的物品
+    const best = candidates.find((c) => !usedItems.has(c.name))
+    if (!best) continue
+
+    cell.itemName = best.name
+    cell.histDistance = best.distance
+    cell.status = cell.quantity != null ? 'success' : 'failed'
+    usedItems.add(best.name)
+
+    cell.warnings.push(
+      `[${stageLabel}] 截图${screenshotIndex + 1} 格子[${cell.row},${cell.col}] 兜底补充：相邻格均识别成功，补入「${best.name}」`,
+    )
+  }
 }
 
 /**
@@ -189,25 +239,37 @@ export async function runFullAnalysis(beforeFiles, afterFiles, onProgress) {
   const config = await loadConfig()
   const { items } = config
 
+  const hasBefore = beforeFiles.length > 0
+  const hasAfter = afterFiles.length > 0
+  const single = !hasBefore || !hasAfter
+
   onProgress?.('config', 5)
 
-  onProgress?.('segment', 10)
-  const beforeResult = await analyzeStage(beforeFiles, (p) =>
-    onProgress?.('match', 10 + p * 0.35),
-    '跑图前',
-  )
+  let beforeResult = null
+  let afterResult = null
 
-  onProgress?.('ocr', 50)
-  const afterResult = await analyzeStage(afterFiles, (p) =>
-    onProgress?.('ocr', 50 + p * 0.35),
-    '跑图后',
-  )
+  if (hasBefore) {
+    onProgress?.('segment', 10)
+    beforeResult = await analyzeStage(beforeFiles, (p) =>
+      onProgress?.('match', 10 + p * (single ? 0.75 : 0.35)),
+      '跑图前',
+    )
+  }
+
+  if (hasAfter) {
+    const base = single ? 10 : 50
+    onProgress?.('ocr', base)
+    afterResult = await analyzeStage(afterFiles, (p) =>
+      onProgress?.('ocr', base + p * (single ? 0.75 : 0.35)),
+      '跑图后',
+    )
+  }
 
   onProgress?.('validate', 88)
 
   const allErrors = []
-  if (beforeResult.blocked) allErrors.push(...beforeResult.errors)
-  if (afterResult.blocked) allErrors.push(...afterResult.errors)
+  if (beforeResult?.blocked) allErrors.push(...beforeResult.errors)
+  if (afterResult?.blocked) allErrors.push(...afterResult.errors)
 
   if (allErrors.length > 0) {
     onProgress?.('validate', 95)
@@ -216,13 +278,17 @@ export async function runFullAnalysis(beforeFiles, afterFiles, onProgress) {
       afterResult,
       delta: null,
       errors: allErrors,
-      warnings: [...(beforeResult.warnings || []), ...(afterResult.warnings || [])],
+      warnings: [...(beforeResult?.warnings || []), ...(afterResult?.warnings || [])],
       blocked: true,
     }
   }
 
   onProgress?.('compute', 95)
-  const delta = computeDelta(beforeResult.totals, afterResult.totals, items)
+  const delta = computeDelta(
+    beforeResult?.totals || null,
+    afterResult?.totals || null,
+    items,
+  )
 
   onProgress?.('compute', 100)
 
@@ -231,7 +297,7 @@ export async function runFullAnalysis(beforeFiles, afterFiles, onProgress) {
     afterResult,
     delta,
     errors: [],
-    warnings: [...(beforeResult.warnings || []), ...(afterResult.warnings || [])],
+    warnings: [...(beforeResult?.warnings || []), ...(afterResult?.warnings || [])],
     blocked: false,
   }
 }
