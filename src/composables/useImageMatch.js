@@ -224,7 +224,45 @@ function preprocessCellIcon(iconImageData, settings) {
 // 匹配
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * 检测图标区左上角 5%×5% 区域是否存在绿色角标
+ * 在遮罩之前调用，遮罩会把角标色替换掉
+ * @returns {{ ratio: number, hasMarker: boolean }}
+ */
+function checkCornerMarkerPresence(iconImageData, settings) {
+  const { data, width, height } = iconImageData
+  const markerHex = settings.cornerMarkerColor
+  if (!markerHex) return { ratio: 0, hasMarker: true } // 无配置则跳过检查
+
+  const h = markerHex.replace('#', '')
+  const c = { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) }
+  const tol = settings.cellColorTolerance ?? 45
+
+  const checkW = Math.max(1, Math.round(width * 0.05))
+  const checkH = Math.max(1, Math.round(height * 0.05))
+
+  let matchCount = 0
+  let totalCount = 0
+  for (let y = 0; y < checkH; y++) {
+    for (let x = 0; x < checkW; x++) {
+      const i = (y * width + x) * 4
+      const dist = Math.hypot(data[i] - c.r, data[i + 1] - c.g, data[i + 2] - c.b)
+      if (dist < tol) matchCount++
+      totalCount++
+    }
+  }
+
+  const ratio = totalCount > 0 ? matchCount / totalCount : 0
+  // 左上角 5%×5% 区域理应基本全是绿色角标，≥60% 才算有效
+  return { ratio, hasMarker: ratio >= 0.60 }
+}
+
 export function matchCellIcon(iconImageData, refHashes, settings = {}) {
+  // ── 角标检测：在遮罩前检查左上角是否有绿色角标 ──
+  const { hasMarker: hasCornerMarker } = checkCornerMarkerPresence(iconImageData, settings)
+  // 缺角标的格子可能定位偏移，最终置信度扣 20%
+  const cornerPenalty = hasCornerMarker ? 0 : 0.10
+
   // ── 预处理 ──
   const cell = preprocessCellIcon(iconImageData, settings)
 
@@ -243,7 +281,7 @@ export function matchCellIcon(iconImageData, refHashes, settings = {}) {
 
     const colorScore = histIntersect3(cell.colorHist, ref.colorHist)
     const edgeScore = histIntersect1(cell.edgeHist, ref.edgeHist)
-    const histScore = 0.55 * colorScore + 0.45 * edgeScore
+    const histScore = Math.max(0, 0.55 * colorScore + 0.45 * edgeScore - cornerPenalty)
 
     candidates.push({
       name: ref.name,

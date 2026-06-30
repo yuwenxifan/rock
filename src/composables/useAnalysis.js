@@ -98,9 +98,6 @@ async function analyzeScreenshot(file, screenshotIndex, refHashes, settings, ite
     })
   }
 
-  // ── 兜底填充：相邻格均识别成功 → 该格也应纳入统计 ──
-  fillGapCells(cellResults, screenshotIndex, stageLabel)
-
   return { cellResults, imageData, imageUrl: img.src, width: img.width, height: img.height }
 }
 
@@ -137,6 +134,7 @@ function fillGapCells(cellResults, screenshotIndex, stageLabel) {
     cell.itemName = best.name
     cell.histDistance = best.distance
     cell.status = cell.quantity != null ? 'success' : 'failed'
+    cell._gapFilled = true
     usedItems.add(best.name)
 
     cell.warnings.push(
@@ -218,6 +216,22 @@ export async function analyzeStage(files, onProgress, stageLabel = '') {
     }
   }
   stageWarnings.push(...warnings)
+
+  // ── 兜底填充：去重之后执行，已被丢弃的格不会再被当作成功邻居 ──
+  for (const ss of screenshotDebug) {
+    fillGapCells(ss.cells, ss.index, stageLabel)
+  }
+
+  // 将兜底填充的格纳入统计
+  for (const ss of screenshotDebug) {
+    for (const cell of ss.cells) {
+      if (cell._gapFilled && cell.itemName && cell.quantity != null) {
+        if (!(cell.itemName in totals)) {
+          totals[cell.itemName] = cell.quantity
+        }
+      }
+    }
+  }
 
   return {
     cells: allCells,

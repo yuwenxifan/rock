@@ -513,7 +513,7 @@ function getIconRegion(cell) {
   const { x, y, width, height } = cell
 
   // 与 extractCellRegions 保持完全一致
-  const qtyTop = Math.round(y + height * 0.78)
+  const qtyTop = Math.round(y + height * 0.75)
   const iconTop = Math.round(y + height * 0.06)
   const iconBottom = Math.max(iconTop + 4, qtyTop - 2)
   const iconLeft = Math.round(x + width * 0.08)

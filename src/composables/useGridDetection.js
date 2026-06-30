@@ -8,6 +8,8 @@
  * 4. 用背包底色 (#F3EDDD) 精调右边界和下边界，排除半透明间隙
  */
 
+const CELL_BODY_HEIGHT_RATIO = 0.75  // 数量条在格子高度 75% 处开始，与 extractCellRegions 保持一致
+
 export function detectGridCells(imageData, settings) {
   const { width, height, data } = imageData
   const {
@@ -75,6 +77,8 @@ export function detectGridCells(imageData, settings) {
   rowGroups.forEach((row, i) => rowToOrigIdx.set(row, i))
   const keptIndices = validRows.map(r => rowToOrigIdx.get(r.row)).filter(i => i != null).sort((a, b) => a - b)
 
+  const validRowCount = validRows.length
+
   /** @type {Array<{ row: Array, rowIndex: number }>} */
   const rowsToGenerate = validRows.map(r => ({ row: r.row, rowIndex: r.rowIndex }))
   if (keptIndices.length > 0) {
@@ -87,12 +91,21 @@ export function detectGridCells(imageData, settings) {
     }
     // 下方相邻行
     if (maxI < rowGroups.length - 1 && rowGroups[maxI + 1].length >= 1) {
-      rowsToGenerate.push({ row: rowGroups[maxI + 1], rowIndex: validRows.length })
+      rowsToGenerate.push({ row: rowGroups[maxI + 1], rowIndex: validRowCount })
     }
   }
 
+  // 确定 Y 方向上的边缘行索引（最顶行和最底行）
+  const allRowIndices = rowsToGenerate.map(r => r.rowIndex)
+  const edgeMinIdx = Math.min(...allRowIndices)
+  const edgeMaxIdx = Math.max(...allRowIndices)
+
   for (const { row, rowIndex } of rowsToGenerate) {
     const rowY = gridOrigin.y + rowIndex * rowSpacing
+    const isEdgeRow = rowIndex === edgeMinIdx || rowIndex === edgeMaxIdx
+
+    const rowPassed = []   // 本行通过校验的格子
+    const rowSkipped = []  // 本行被跳过的格子
 
     for (let col = 0; col < gridColumns; col++) {
       const x = gridOrigin.x + col * colSpacing
@@ -101,7 +114,7 @@ export function detectGridCells(imageData, settings) {
       const rect = { x: Math.round(x), y: Math.round(y), width: template.width, height: template.height }
 
       if (!isCompleteCell(rect, width, height, margin)) {
-        skipped.push({ rect, reason: '格子不完整或被裁切', row: rowIndex, col })
+        rowSkipped.push({ rect, reason: '格子不完整或被裁切', row: rowIndex, col })
         continue
       }
 
@@ -111,11 +124,11 @@ export function detectGridCells(imageData, settings) {
       )
 
       if (!hasBar) {
-        skipped.push({ rect, reason: '未检测到数量条（可能为空位或非物品格）', row: rowIndex, col })
+        rowSkipped.push({ rect, reason: '未检测到数量条（可能为空位或非物品格）', row: rowIndex, col })
         continue
       }
 
-      cells.push({
+      rowPassed.push({
         x: rect.x,
         y: rect.y,
         width: rect.width,
@@ -127,6 +140,20 @@ export function detectGridCells(imageData, settings) {
         hasMarker: true,
       })
     }
+
+    // 边缘行完整性校验：必须全部在边界内，且至少一半格子有数量条
+    // 半透明间隙在亮环境下可能让 isCompleteCell 误通过，因此边缘行统一加严
+    // 不合格的整行静默丢弃，不加入 cells 也不加入 skipped（不在画布上显示）
+    if (isEdgeRow) {
+      const hasIncomplete = rowSkipped.some(s => s.reason.includes('不完整或被裁切'))
+      const minBars = Math.ceil(gridColumns * 0.5)
+      if (hasIncomplete || rowPassed.length < minBars) {
+        continue  // 整行丢弃，不渲染任何边界或跳过标记
+      }
+    }
+
+    cells.push(...rowPassed)
+    skipped.push(...rowSkipped)
   }
 
   return {
@@ -338,28 +365,51 @@ function computeRobustRowSpacing(validRows, colSpacing) {
  * - 用 #272727 数量条验证格子高度是否合理
  */
 function buildPreciseTemplate(data, width, height, validRows, colSpacing, rowSpacing, cellColors, cellTol, qtyColor, qtyTol) {
-  // ── 测量实际格子视觉宽度（从绿三角到 #F3EDDD 右边界）──
-  const measuredWidths = []
-  const sampleRows = validRows.slice(0, Math.min(validRows.length, 3))
+  // ── Phase 1: 垂直扫描 — 从绿三角向下找 cell body → 数量条边界 ──
+  // 格子间隙半透明，受环境光影响，水平扫描在亮环境下不可靠。
+  // 改为向下找 beige → #272727 数量条的过渡，双方都是实色，更稳定。
+  const measuredVertical = []
+  const sampleRows = validRows.slice(1, Math.min(validRows.length, 4))  // 跳过第1行（可能被遮挡）
 
   for (const row of sampleRows) {
-    // 每行取前几个格子（避开可能的边缘异常）
     const sampleAnchors = row.row.slice(0, Math.min(row.row.length, 4))
     for (const anchor of sampleAnchors) {
-      const rightEdge = findCellRightEdge(
+      const bodyBottom = findCellBodyBottom(
         data, width, anchor.minX, anchor.minY, colSpacing, cellColors, cellTol,
       )
-      const cellW = rightEdge - anchor.minX + 1
-      // 合理范围：colSpacing 的 65%~100%（小于 colSpacing 说明有间隙）
-      if (cellW >= colSpacing * 0.65 && cellW <= colSpacing) {
-        measuredWidths.push(cellW)
+      if (bodyBottom != null) {
+        const cellBodyH = bodyBottom - anchor.minY + 1
+        // CELL_BODY_HEIGHT_RATIO = 0.75：数量条从格子高度 75% 处开始
+        const derivedSize = Math.round(cellBodyH / CELL_BODY_HEIGHT_RATIO)
+        if (derivedSize >= colSpacing * 0.65 && derivedSize <= colSpacing) {
+          measuredVertical.push(derivedSize)
+        }
       }
     }
   }
 
+  // ── Phase 2: 水平回退 — 仅当垂直测量不足 2 个时才启用 ──
+  let measuredHorizontal = []
+  if (measuredVertical.length < 2) {
+    for (const row of sampleRows) {
+      const sampleAnchors = row.row.slice(0, Math.min(row.row.length, 4))
+      for (const anchor of sampleAnchors) {
+        const rightEdge = findCellRightEdge(
+          data, width, anchor.minX, anchor.minY, colSpacing, cellColors, cellTol,
+        )
+        const cellW = rightEdge - anchor.minX + 1
+        if (cellW >= colSpacing * 0.65 && cellW <= colSpacing) {
+          measuredHorizontal.push(cellW)
+        }
+      }
+    }
+  }
+
+  // ── 合并，取中位数 ──
+  const allMeasurements = [...measuredVertical, ...measuredHorizontal]
   let cellSize
-  if (measuredWidths.length >= 2) {
-    cellSize = Math.round(median(measuredWidths))
+  if (allMeasurements.length >= 2) {
+    cellSize = Math.round(median(allMeasurements))
   } else {
     // 回退：假设间隙约占 8%，格子占 92%
     cellSize = Math.round(colSpacing * 0.92)
@@ -369,7 +419,7 @@ function buildPreciseTemplate(data, width, height, validRows, colSpacing, rowSpa
   let barCheckOk = 0
   let barCheckTotal = 0
 
-  for (const row of validRows.slice(0, Math.min(validRows.length, 4))) {
+  for (const row of validRows.slice(1, Math.min(validRows.length, 5))) {  // 跳过第1行（可能被遮挡）
     if (row.row.length === 0) continue
     const anchor = row.row[0]
     barCheckTotal++
@@ -391,7 +441,7 @@ function buildPreciseTemplate(data, width, height, validRows, colSpacing, rowSpa
     width: cellSize,
     height: cellSize,
     colSpacing,
-    measuredWidths: measuredWidths.length,
+    measuredWidths: allMeasurements.length,
     samples: barCheckTotal,
     barChecksPassed: barCheckOk,
   }
@@ -453,6 +503,60 @@ function findCellRightEdge(data, width, ax, ay, colSpacing, cellColors, tol) {
   }
 
   return Math.min(rightEdge, ax + Math.round(colSpacing * 1.12))
+}
+
+/**
+ * 从绿三角位置向下扫描，找到 cell body (#F3EDDD) → 数量条 (#272727) 的边界
+ *
+ * 扫描策略：
+ * - 在 cell body 中部水平带内逐行计算 beige 背景色占比
+ * - 找到占比从高位急剧下降的位置 → 即 cell body 的下边界 / 数量条的上边界
+ * - 搜索范围限制在 colSpacing 的 50%~115%，避免扫到三角区或相邻格子
+ *
+ * @returns {number|null} 边界 Y 坐标，未找到时返回 null
+ */
+function findCellBodyBottom(data, width, ax, ay, colSpacing, cellColors, tol) {
+  const searchTop = ay + Math.round(colSpacing * 0.50)
+  const searchBottom = ay + Math.round(colSpacing * 1.15)
+
+  // 在格子左侧三角区采样（格子左边界 → 图标区左边界），
+  // 该区域没有物品干扰，beige 背景占比更纯净，数量条边界判定更准确
+  const sampleLeft = ax + Math.round(colSpacing * 0.02)
+  const sampleRight = ax + Math.round(colSpacing * 0.08)
+
+  // 逐行采样，计算每行的 beige 背景色占比
+  const ratios = []
+  for (let y = searchTop; y <= searchBottom; y++) {
+    let cellPixels = 0
+    let totalPixels = 0
+    for (let x = sampleLeft; x <= sampleRight; x++) {
+      if (isCellBgPixel(data, width, x, y, cellColors, tol)) cellPixels++
+      totalPixels++
+    }
+    ratios.push({ y, ratio: totalPixels > 0 ? cellPixels / totalPixels : 0 })
+  }
+
+  if (ratios.length === 0) return null
+
+  const maxRatio = Math.max(...ratios.map((r) => r.ratio))
+
+  // 如果最高占比都不到 15%，说明该区域根本不是 cell body
+  if (maxRatio < 0.15) return null
+
+  const dropThreshold = maxRatio * 0.35
+
+  for (let i = 1; i < ratios.length; i++) {
+    if (ratios[i - 1].ratio >= dropThreshold && ratios[i].ratio < dropThreshold) {
+      const boundaryY = ratios[i - 1].y
+      // 合理性检查：边界不应太靠上（还没离开三角区）也不应超过 colSpacing
+      if (boundaryY >= ay + colSpacing * 0.55 && boundaryY <= ay + colSpacing * 1.10) {
+        return boundaryY
+      }
+      return null  // 找到了 drop 但位置不合理
+    }
+  }
+
+  return null  // 没找到明显跌落
 }
 
 /**
@@ -602,7 +706,7 @@ export function extractCellRegions(imageData, cell, _settings = {}) {
   const { x, y, width, height } = cell
 
   // 数量条区域：固定在格子底部，宽度 = 格子宽，高度约占格子 22%
-  const qtyTop = Math.round(y + height * 0.78)
+  const qtyTop = Math.round(y + height * CELL_BODY_HEIGHT_RATIO)
   const qtyBottom = Math.round(y + height * 0.99)
   const qtyLeft = x
   const qtyRight = x + width
