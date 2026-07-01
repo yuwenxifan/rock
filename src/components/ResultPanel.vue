@@ -1,6 +1,8 @@
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { BALL_ORDER, CATEGORY_ORDER } from '../utils/constants.js'
+import { computed, ref, reactive, onMounted, onUnmounted } from 'vue'
+import { BALL_ORDER, BALL_COLORS, CATEGORY_ORDER } from '../utils/constants.js'
+
+const BASE = import.meta.env.BASE_URL
 
 const props = defineProps({
   delta: { type: Object, default: null },
@@ -11,6 +13,11 @@ const props = defineProps({
 const emit = defineEmits(['jump-screenshot'])
 const showColumns = ref(window.innerWidth >= 900)
 const mobile = ref(false)
+
+const imgFailed = reactive({})
+function onImgError(name) {
+  imgFailed[name] = true
+}
 
 function onResize() {
   mobile.value = window.innerWidth < 768
@@ -26,7 +33,7 @@ onUnmounted(() => {
 })
 
 // 移动端列宽：压缩固定宽度列，避免横向滚动条
-const nameMinW = computed(() => mobile.value ? 55 : 100)
+const nameMinW = computed(() => mobile.value ? 70 : 115)
 const catW = computed(() => mobile.value ? 45 : 70)
 const ballMinW = computed(() => mobile.value ? 60 : 90)
 const qtyW = computed(() => mobile.value ? 55 : 100)
@@ -61,6 +68,7 @@ const ballRows = computed(() => {
   return BALL_ORDER.filter((ball) => isSingle.value ? (props.delta.ballSummary[ball] ?? 0) > 0 : true).map((ball) => ({
     ball,
     delta: props.delta.ballSummary[ball] ?? 0,
+    color: BALL_COLORS[ball] || '#909399',
   }))
 })
 
@@ -103,7 +111,7 @@ function jumpToScreenshot(stage, index) {
     <div class="summary-section">
       <h4>花 / 矿{{ isSingle ? '统计' : '分类汇总' }}</h4>
       <div class="summary-cards">
-        <div v-for="row in categoryRows" :key="row.category" class="summary-card">
+        <div v-for="row in categoryRows" :key="row.category" class="summary-card" :class="'card-' + deltaClass(row.delta)">
           <span class="label">{{ row.category }}</span>
           <span :class="['value', deltaClass(row.delta)]">{{ formatDelta(row.delta) }}</span>
         </div>
@@ -114,6 +122,13 @@ function jumpToScreenshot(stage, index) {
       <h4>咕噜球{{ isSingle ? '统计' : '汇总' }}</h4>
       <div class="ball-grid">
         <div v-for="row in ballRows" :key="row.ball" class="ball-item">
+          <img
+            v-if="!imgFailed[row.ball]"
+            :src="BASE + 'config/images/ball/' + row.ball + '.png'"
+            class="ball-img"
+            @error="onImgError(row.ball)"
+          />
+          <span v-else class="ball-dot" :style="{ background: row.color }"></span>
           <span class="ball-name">{{ row.ball }}</span>
           <span :class="['ball-value', deltaClass(row.delta)]">{{ formatDelta(row.delta) }}</span>
         </div>
@@ -129,18 +144,29 @@ function jumpToScreenshot(stage, index) {
       <div class="table-split wide-only">
         <div class="table-scroll table-half">
           <el-table :data="leftItems" stripe border size="small">
-            <el-table-column prop="name" label="物品名" :min-width="nameMinW" />
-            <el-table-column v-if="showColumns || isSingle" prop="category" label="分类" :width="catW" align="center" />
+            <el-table-column label="物品名" :min-width="nameMinW">
+              <template #default="{ row }">
+                <span class="item-name-cell">
+                  <img
+                    :src="BASE + 'config/images/' + row.name + '.png'"
+                    class="item-icon"
+                    @error="(e) => e.target.style.display = 'none'"
+                  />
+                  {{ row.name }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column v-if="showColumns || isSingle" prop="category" label="分类" :min-width="catW" align="center" />
             <el-table-column v-if="showColumns || isSingle" prop="ball" label="对应球" :min-width="ballMinW" />
             <template v-if="isSingle">
-              <el-table-column label="数量" :width="qtyW" align="right">
+              <el-table-column label="数量" :min-width="qtyW" align="right">
                 <template #default="{ row }">{{ row.before ?? row.after ?? 0 }}</template>
               </el-table-column>
             </template>
             <template v-else>
-              <el-table-column prop="before" label="跑图前" :width="stageW" align="right" />
-              <el-table-column prop="after" label="跑图后" :width="stageW" align="right" />
-              <el-table-column label="增量" :width="stageW" align="right">
+              <el-table-column prop="before" label="跑图前" :min-width="stageW" align="right" />
+              <el-table-column prop="after" label="跑图后" :min-width="stageW" align="right" />
+              <el-table-column label="增量" :min-width="stageW" align="right">
                 <template #default="{ row }">
                   <span :class="deltaClass(row.delta)">{{ formatDelta(row.delta) }}</span>
                 </template>
@@ -150,18 +176,29 @@ function jumpToScreenshot(stage, index) {
         </div>
         <div class="table-scroll table-half">
           <el-table :data="rightItems" stripe border size="small">
-            <el-table-column prop="name" label="物品名" :min-width="nameMinW" />
-            <el-table-column v-if="showColumns || isSingle" prop="category" label="分类" :width="catW" align="center" />
+            <el-table-column label="物品名" :min-width="nameMinW">
+              <template #default="{ row }">
+                <span class="item-name-cell">
+                  <img
+                    :src="BASE + 'config/images/' + row.name + '.png'"
+                    class="item-icon"
+                    @error="(e) => e.target.style.display = 'none'"
+                  />
+                  {{ row.name }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column v-if="showColumns || isSingle" prop="category" label="分类" :min-width="catW" align="center" />
             <el-table-column v-if="showColumns || isSingle" prop="ball" label="对应球" :min-width="ballMinW" />
             <template v-if="isSingle">
-              <el-table-column label="数量" :width="qtyW" align="right">
+              <el-table-column label="数量" :min-width="qtyW" align="right">
                 <template #default="{ row }">{{ row.before ?? row.after ?? 0 }}</template>
               </el-table-column>
             </template>
             <template v-else>
-              <el-table-column prop="before" label="跑图前" :width="stageW" align="right" />
-              <el-table-column prop="after" label="跑图后" :width="stageW" align="right" />
-              <el-table-column label="增量" :width="stageW" align="right">
+              <el-table-column prop="before" label="跑图前" :min-width="stageW" align="right" />
+              <el-table-column prop="after" label="跑图后" :min-width="stageW" align="right" />
+              <el-table-column label="增量" :min-width="stageW" align="right">
                 <template #default="{ row }">
                   <span :class="deltaClass(row.delta)">{{ formatDelta(row.delta) }}</span>
                 </template>
@@ -173,18 +210,29 @@ function jumpToScreenshot(stage, index) {
       <!-- 窄屏单栏 -->
       <div class="table-scroll narrow-only">
         <el-table :data="delta.itemDeltas" stripe border size="small">
-          <el-table-column prop="name" label="物品名" :min-width="nameMinW" />
-          <el-table-column v-if="showColumns || isSingle" prop="category" label="分类" :width="catW" align="center" />
+          <el-table-column label="物品名" :min-width="nameMinW">
+            <template #default="{ row }">
+              <span class="item-name-cell">
+                <img
+                  :src="BASE + 'config/images/' + row.name + '.png'"
+                  class="item-icon"
+                  @error="(e) => e.target.style.display = 'none'"
+                />
+                {{ row.name }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="showColumns || isSingle" prop="category" label="分类" :min-width="catW" align="center" />
           <el-table-column v-if="showColumns || isSingle" prop="ball" label="对应球" :min-width="ballMinW" />
           <template v-if="isSingle">
-            <el-table-column label="数量" :width="qtyW" align="right">
+            <el-table-column label="数量" :min-width="qtyW" align="right">
               <template #default="{ row }">{{ row.before ?? row.after ?? 0 }}</template>
             </el-table-column>
           </template>
           <template v-else>
-            <el-table-column prop="before" label="跑图前" :width="stageW" align="right" />
-            <el-table-column prop="after" label="跑图后" :width="stageW" align="right" />
-            <el-table-column label="增量" :width="stageW" align="right">
+            <el-table-column prop="before" label="跑图前" :min-width="stageW" align="right" />
+            <el-table-column prop="after" label="跑图后" :min-width="stageW" align="right" />
+            <el-table-column label="增量" :min-width="stageW" align="right">
               <template #default="{ row }">
                 <span :class="deltaClass(row.delta)">{{ formatDelta(row.delta) }}</span>
               </template>
@@ -216,8 +264,8 @@ function jumpToScreenshot(stage, index) {
 
 .stage-badge {
   display: inline-block;
-  background: #ecf5ff;
-  color: #409eff;
+  background: #fdf3e8;
+  color: #d4884a;
   font-size: 12px;
   padding: 4px 12px;
   border-radius: 4px;
@@ -244,7 +292,47 @@ function jumpToScreenshot(stage, index) {
 .summary-section h4 {
   margin: 0 0 10px;
   font-size: 14px;
-  color: #303133;
+  color: #2c2c2c;
+  font-weight: 600;
+}
+
+/* ── 表格微调 ── */
+.summary-section :deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.summary-section :deep(.el-table th.el-table__cell) {
+  font-size: 12px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.summary-section :deep(.el-table .cell) {
+  padding: 8px 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-section :deep(.el-table__cell[align="right"] .cell),
+.summary-section :deep(.el-table__cell.is-right .cell) {
+  font-weight: 600;
+}
+
+.item-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.item-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex-shrink: 0;
+  transform: scale(1.4);
+  transform-origin: center;
+  image-rendering: auto;
 }
 
 .table-scroll {
@@ -287,16 +375,34 @@ function jumpToScreenshot(stage, index) {
 
 .summary-card {
   flex: 1;
-  background: #f5f7fa;
-  border-radius: 8px;
-  padding: 14px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px 14px;
   text-align: center;
+  border: 1px solid #ebeef5;
+  transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+.summary-card.card-positive {
+  background: #f0f9eb;
+  border-color: #c2e7b0;
+}
+
+.summary-card.card-negative {
+  background: #fef0f0;
+  border-color: #fbc4c4;
+}
+
+.summary-card.card-zero {
+  background: #f5f7fa;
+  border-color: #e4e7ed;
 }
 
 .summary-card .label {
   display: block;
-  font-size: 13px;
-  color: #606266;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5d5d5d;
   margin-bottom: 6px;
 }
 
@@ -305,24 +411,61 @@ function jumpToScreenshot(stage, index) {
   font-weight: bold;
 }
 
+.summary-card.card-positive .value { color: #5aaf2a; }
+.summary-card.card-negative .value { color: #e04545; }
+
 .ball-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 8px;
 }
 
 .ball-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  background: #f5f7fa;
-  border-radius: 6px;
-  padding: 8px 10px;
+  gap: 6px;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 10px 6px 30px;
+  border: 1px solid #ebeef5;
+  transition: box-shadow 0.2s;
+  position: relative;
+  overflow: visible;
+  margin-left: 10px;
+}
+
+.ball-item:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.ball-dot {
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+}
+
+.ball-img {
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: auto;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25));
 }
 
 .ball-name {
   font-size: 12px;
   color: #606266;
+  flex: 1;
+  white-space: nowrap;
+  font-weight: 600;
 }
 
 .ball-value {
@@ -374,7 +517,7 @@ function jumpToScreenshot(stage, index) {
   }
 
   .summary-card {
-    padding: 10px 8px;
+    padding: 12px 8px;
   }
 
   .summary-card .label {

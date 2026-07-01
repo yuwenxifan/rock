@@ -11,6 +11,19 @@ export const BALL_ORDER = [
   '变幻球',
 ]
 
+export const BALL_COLORS = {
+  '普通球': '#8b9cb0',
+  '光合球': '#67c23a',
+  '网兜球': '#e6a23c',
+  '调温球': '#f56c6c',
+  '淘沙球': '#c77d33',
+  '绝缘球': '#c9b540',
+  '美妙球': '#e88eb0',
+  '好战球': '#e85d3a',
+  '暗星球': '#7b5ea7',
+  '变幻球': '#409eff',
+}
+
 export const CATEGORY_ORDER = ['花', '矿']
 
 export const MAX_FILE_SIZE = 10 * 1024 * 1024

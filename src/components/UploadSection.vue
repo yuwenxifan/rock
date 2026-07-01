@@ -7,6 +7,7 @@ const props = defineProps({
   title: { type: String, required: true },
   stage: { type: String, required: true },
   images: { type: Array, default: () => [] },
+  activeIndex: { type: Number, default: 0 },
 })
 
 const emit = defineEmits(['add', 'remove', 'select'])
@@ -69,7 +70,12 @@ function handleSelect(index) {
       class="upload-dragger"
     >
       <div class="upload-inner">
-        <div class="upload-icon">📷</div>
+        <svg class="upload-icon-svg" viewBox="0 0 36 36" fill="none">
+            <rect x="2" y="6" width="32" height="24" rx="3" stroke="currentColor" stroke-width="1.5" opacity="0.4"/>
+            <circle cx="12" cy="16" r="3.5" stroke="currentColor" stroke-width="1.5" opacity="0.7"/>
+            <path d="M2 25l8-8 6 5 5-5 11 9" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" opacity="0.4"/>
+            <path d="M27 7l1 1.5 1.5 1-1.5 1-1 1.5-1-1.5-1.5-1 1.5-1z" fill="#e6a23c"/>
+          </svg>
         <div>拖拽或点击上传截图</div>
         <div class="upload-hint">PNG / JPG，单张 ≤ 10MB，可多张</div>
       </div>
@@ -80,6 +86,7 @@ function handleSelect(index) {
         v-for="(img, idx) in images"
         :key="idx"
         class="thumb-item"
+        :class="{ active: idx === activeIndex }"
         @click="handleSelect(idx)"
       >
         <img :src="getUrl(img)" :alt="`截图${idx + 1}`" />
@@ -107,7 +114,7 @@ function handleSelect(index) {
 .upload-section h3 {
   margin: 0 0 8px;
   font-size: 15px;
-  color: #303133;
+  color: #2c2c2c;
 }
 
 .upload-dragger {
@@ -116,6 +123,15 @@ function handleSelect(index) {
 
 .upload-dragger :deep(.el-upload-dragger) {
   padding: 16px 12px;
+  border: 2px dashed #d0d7de;
+  border-radius: 10px;
+  transition: border-color 0.25s, background 0.25s;
+  background: rgba(255,255,255,0.5);
+}
+
+.upload-dragger :deep(.el-upload-dragger):hover {
+  border-color: #d4884a;
+  background: rgba(255,255,255,0.8);
 }
 
 @media (max-width: 767px) {
@@ -127,8 +143,9 @@ function handleSelect(index) {
     font-size: 12px;
   }
 
-  .upload-icon {
-    font-size: 22px;
+  .upload-icon-svg {
+    width: 30px;
+    height: 30px;
     margin-bottom: 2px;
   }
 
@@ -144,6 +161,15 @@ function handleSelect(index) {
     width: 64px;
     height: 38px;
   }
+
+  .thumb-delete {
+    top: -8px !important;
+    right: -8px !important;
+    width: 24px !important;
+    height: 24px !important;
+    min-height: 24px !important;
+    font-size: 16px;
+  }
 }
 
 .upload-inner {
@@ -152,9 +178,16 @@ function handleSelect(index) {
   font-size: 13px;
 }
 
-.upload-icon {
-  font-size: 28px;
+.upload-icon-svg {
+  width: 36px;
+  height: 36px;
   margin-bottom: 4px;
+  color: #909399;
+  transition: color 0.25s;
+}
+
+.upload-dragger:hover .upload-icon-svg {
+  color: #d4884a;
 }
 
 .upload-hint {
@@ -174,18 +207,29 @@ function handleSelect(index) {
   position: relative;
   width: 80px;
   cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.thumb-item.active {
+  transform: translateY(-2px);
 }
 
 .thumb-item img {
   width: 80px;
   height: 48px;
   object-fit: cover;
-  border-radius: 4px;
+  border-radius: 5px;
   border: 2px solid #dcdfe6;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .thumb-item:hover img {
-  border-color: #409eff;
+  border-color: #d4884a;
+}
+
+.thumb-item.active img {
+  border-color: #d4884a;
+  box-shadow: 0 0 0 3px rgba(212, 136, 74, 0.25);
 }
 
 .thumb-label {
@@ -194,6 +238,12 @@ function handleSelect(index) {
   text-align: center;
   margin-top: 2px;
   color: #606266;
+  transition: color 0.2s, font-weight 0.2s;
+}
+
+.thumb-item.active .thumb-label {
+  color: #d4884a;
+  font-weight: 600;
 }
 
 .thumb-delete {

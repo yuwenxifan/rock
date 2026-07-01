@@ -91,7 +91,7 @@ function drawOverlay(canvas, img, cells, imageData, imgW, imgH) {
       const { iconRect, qtyRect } = extractCellRegions(imageData, rect, gridSettings.value || {})
 
       ctx.setLineDash([4, 3])
-      ctx.strokeStyle = '#409eff'
+      ctx.strokeStyle = '#d4884a'
       ctx.lineWidth = 1.5
       ctx.strokeRect(
         (iconRect.x - cropX) * scale, (iconRect.y - cropY) * scale,
@@ -299,12 +299,15 @@ function excludeCell() {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ebeef5;
 }
 
 .annotate-header h4 {
   margin: 0;
   font-size: 14px;
+  color: #2c2c2c;
 }
 
 .annotate-header .hint {
@@ -319,6 +322,10 @@ function excludeCell() {
   gap: 8px;
   font-size: 12px;
   color: #606266;
+  padding: 4px 10px;
+  background: #f5f7fa;
+  border-radius: 8px;
+  border: 1px solid #ebeef5;
 }
 
 .legend {
@@ -333,7 +340,11 @@ function excludeCell() {
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
+  padding: 2px 8px;
+  background: #f5f7fa;
+  border-radius: 12px;
+  border: 1px solid #ebeef5;
 }
 
 .dot {
@@ -348,7 +359,7 @@ function excludeCell() {
 .dot.gray { background: #909399; }
 .dot.red { background: #f56c6c; }
 .dot.light { background: #c0c4cc; }
-.dot.blue { background: #409eff; }
+.dot.blue { background: #d4884a; }
 .dot.orange { background: #e6a23c; }
 .dot.marker { background: #5D9F11; }
 
@@ -362,14 +373,16 @@ function excludeCell() {
 
 .canvas-wrap {
   display: inline-block;
-  border: 2px solid transparent;
-  border-radius: 6px;
-  padding: 3px;
-  margin-bottom: 8px;
+  border: 2px solid #ebeef5;
+  border-radius: 8px;
+  padding: 4px;
+  margin-bottom: 10px;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .canvas-wrap.active {
-  border-color: #409eff;
+  border-color: #d4884a;
+  box-shadow: 0 0 0 3px rgba(212, 136, 74, 0.15);
 }
 
 .canvas-title {
@@ -377,6 +390,7 @@ function excludeCell() {
   color: #606266;
   margin-bottom: 4px;
   font-weight: 500;
+  padding-left: 2px;
 }
 
 .annotate-canvas {

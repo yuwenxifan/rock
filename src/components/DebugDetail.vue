@@ -181,8 +181,8 @@ function drawSegmentOverlay(canvas, cell) {
           <h3>{{ result.label }}</h3>
 
           <!-- OCR 预处理图像 -->
-          <div v-if="getOcrCells(result.data).length" class="ocr-gallery">
-            <h4>OCR 预处理图像（放大 + 二值化翻转后，OCR实际使用的）</h4>
+          <details v-if="getOcrCells(result.data).length" class="ocr-gallery debug-section" open>
+            <summary class="debug-section-title">OCR 预处理图像（放大 + 二值化翻转后，OCR实际使用的）</summary>
             <div v-for="group in groupOcrByRow(result.data)" :key="'ss-' + group.screenshotIndex" class="ocr-screenshot-block">
               <div class="ocr-ss-label">截图 {{ group.screenshotIndex + 1 }}</div>
               <div v-for="row in group.rows" :key="'r-' + group.screenshotIndex + '-' + row.rowIndex" class="ocr-row-block">
@@ -206,11 +206,11 @@ function drawSegmentOverlay(canvas, cell) {
                 </div>
               </div>
             </div>
-          </div>
+          </details>
 
           <!-- 遮罩预览 -->
-          <div v-if="getMaskCells(result.data).length" class="mask-gallery">
-            <h4>遮罩预览 — 图标区颜色遮罩 + contain 128×128（直方图实际输入的图像）</h4>
+          <details v-if="getMaskCells(result.data).length" class="mask-gallery debug-section" open>
+            <summary class="debug-section-title">遮罩预览 — 图标区颜色遮罩 + contain 128×128</summary>
             <div class="mask-grid">
               <div
                 v-for="cell in getMaskCells(result.data)"
@@ -222,11 +222,11 @@ function drawSegmentOverlay(canvas, cell) {
                 <div class="mask-label">{{ cell.itemName || '未匹配' }} [{{ cell.row }},{{ cell.col }}]</div>
               </div>
             </div>
-          </div>
+          </details>
 
           <!-- 模板匹配详情 -->
-          <div v-if="getOcrDebugCells(result.data).length" class="match-debug">
-            <h4>模板匹配详情 — 逐字符对比（红框=选中模板，分数=Jaccard重叠率）</h4>
+          <details v-if="getOcrDebugCells(result.data).length" class="match-debug debug-section" open>
+            <summary class="debug-section-title">模板匹配详情 — 逐字符对比（红框=选中模板，分数=Jaccard重叠率）</summary>
             <div
               v-for="cell in getOcrDebugCells(result.data)"
               :key="'dbg-' + cell.screenshotIndex + '-' + cell.row + '-' + cell.col"
@@ -255,7 +255,7 @@ function drawSegmentOverlay(canvas, cell) {
                 </div>
               </div>
             </div>
-          </div>
+          </details>
         </div>
       </template>
     </template>
@@ -286,6 +286,53 @@ function drawSegmentOverlay(canvas, cell) {
   font-size: 14px;
   text-align: center;
   padding: 24px;
+}
+
+/* ═══════ 折叠面板 ═══════ */
+.debug-section {
+  margin-bottom: 16px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.debug-section[open] {
+  border-color: #d0d7de;
+}
+.debug-section-title {
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c2c2c;
+  cursor: pointer;
+  background: #f5f7fa;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s;
+}
+.debug-section-title::-webkit-details-marker {
+  display: none;
+}
+.debug-section-title::before {
+  content: '▸';
+  display: inline-block;
+  font-size: 10px;
+  transition: transform 0.2s;
+  color: #909399;
+}
+.debug-section[open] > .debug-section-title::before {
+  transform: rotate(90deg);
+}
+.debug-section-title:hover {
+  background: #ebeef5;
+}
+.debug-section > :not(summary) {
+  padding: 0 16px;
+}
+.debug-section > :not(summary):last-child {
+  padding-bottom: 16px;
 }
 
 /* ═══════ OCR 预处理图像画廊 ═══════ */
