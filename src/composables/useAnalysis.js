@@ -117,15 +117,21 @@ function fillGapCells(cellResults, screenshotIndex, stageLabel) {
     cellResults.filter((c) => c.itemName && c.status === 'success').map((c) => c.itemName),
   )
 
+  // 非跳过格子按行优先排序 → 背包物品的自然顺序
+  const ordered = [...cellMap.values()].sort((a, b) => a.row - b.row || a.col - b.col)
+
   for (const cell of cellResults) {
     if (cell.status !== 'ignored' || cell.skipped) continue
     const candidates = cell._candidates
     if (!candidates || candidates.length === 0) continue
 
-    const left = cellMap.get(`${cell.row},${cell.col - 1}`)
-    const right = cellMap.get(`${cell.row},${cell.col + 1}`)
-    if (!left || !right) continue
-    if (left.status !== 'success' || right.status !== 'success') continue
+    // 在自然顺序中找该格子的位置，检查前后邻居
+    const idx = ordered.findIndex((c) => c.row === cell.row && c.col === cell.col)
+    if (idx < 0) continue
+    const prev = idx > 0 ? ordered[idx - 1] : null
+    const next = idx < ordered.length - 1 ? ordered[idx + 1] : null
+
+    if (!prev || !next || prev.status !== 'success' || next.status !== 'success') continue
 
     // 选置信度最高且未被同截图其他格子使用的物品
     const best = candidates.find((c) => !usedItems.has(c.name))

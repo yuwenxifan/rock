@@ -141,15 +141,11 @@ export function detectGridCells(imageData, settings) {
       })
     }
 
-    // 边缘行完整性校验：必须全部在边界内，且至少一半格子有数量条
-    // 半透明间隙在亮环境下可能让 isCompleteCell 误通过，因此边缘行统一加严
-    // 不合格的整行静默丢弃，不加入 cells 也不加入 skipped（不在画布上显示）
-    if (isEdgeRow) {
-      const hasIncomplete = rowSkipped.some(s => s.reason.includes('不完整或被裁切'))
-      const minBars = Math.ceil(gridColumns * 0.5)
-      if (hasIncomplete || rowPassed.length < minBars) {
-        continue  // 整行丢弃，不渲染任何边界或跳过标记
-      }
+    // 行完整性校验：有格子不完整/被裁切，或超过半数格子无数量条 → 整行静默丢弃
+    const hasIncomplete = rowSkipped.some(s => s.reason.includes('不完整或被裁切'))
+    const minBars = Math.ceil(gridColumns * 0.5)
+    if (hasIncomplete || rowPassed.length < minBars) {
+      continue
     }
 
     cells.push(...rowPassed)
@@ -660,18 +656,29 @@ export function findQuantityBar(data, width, left, top, cellW, colSpacing, qtyCo
 // ─── 第四步：生成格子 ────────────────────────────────────────
 
 function computeGridOrigin(validRows, template, colSpacing, gridColumns) {
-  // 找到最左边列的 X 坐标（对齐到网格）
   const allAnchors = validRows.flatMap((r) => r.row)
-  const minX = Math.min(...allAnchors.map((a) => a.minX))
   const minY = Math.min(...allAnchors.map((a) => a.minY))
 
-  // 对齐：确保 col 0 对应最左列的标记
-  const leftmostAnchors = allAnchors
-    .filter((a) => Math.abs(a.minX - minX) < colSpacing * 0.5)
+  // 收集所有锚点的 minX，用中位数 + 离群点剔除估算最左列 X
+  const allXs = allAnchors.map((a) => a.minX).sort((a, b) => a - b)
+  const globalMinX = allXs[0]
 
-  const alignedX = leftmostAnchors.length > 0
-    ? Math.round(leftmostAnchors.reduce((s, a) => s + a.minX, 0) / leftmostAnchors.length)
-    : minX
+  // 第一轮：筛选出最左列的候选（距全局最小 X 在半列间距内）
+  const leftmostXs = allXs.filter((x) => Math.abs(x - globalMinX) < colSpacing * 0.5)
+
+  // 取中位数作为列 0 的参考值，抗异常
+  const refX = median(leftmostXs)
+
+  // 第二轮：丢掉偏离参考值超过 6px 的点（绿标宽度 8-55px，正常同列 minX 偏差应极小）
+  const inliers = leftmostXs.filter((x) => Math.abs(x - refX) <= 6)
+
+  let alignedX = Math.round(median(inliers.length >= 2 ? inliers : leftmostXs))
+
+  // 圆角修正：绿标位于格子圆角内侧，minX 比实际左直边略偏右
+  // 以格子高度百分比向左补偿，适应不同分辨率
+  if (template && template.height > 0) {
+    alignedX = Math.round(alignedX - template.height * 0.015)
+  }
 
   return { x: alignedX, y: minY }
 }

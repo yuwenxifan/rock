@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { BALL_ORDER, CATEGORY_ORDER } from '../utils/constants.js'
 
 const props = defineProps({
@@ -10,6 +10,27 @@ const props = defineProps({
 
 const emit = defineEmits(['jump-screenshot'])
 const showColumns = ref(window.innerWidth >= 900)
+const mobile = ref(false)
+
+function onResize() {
+  mobile.value = window.innerWidth < 768
+}
+
+onMounted(() => {
+  onResize()
+  window.addEventListener('resize', onResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
+})
+
+// 移动端列宽：压缩固定宽度列，避免横向滚动条
+const nameMinW = computed(() => mobile.value ? 55 : 100)
+const catW = computed(() => mobile.value ? 45 : 70)
+const ballMinW = computed(() => mobile.value ? 60 : 90)
+const qtyW = computed(() => mobile.value ? 55 : 100)
+const stageW = computed(() => mobile.value ? 60 : 80)
 
 const isSingle = computed(() => props.delta?.single ?? false)
 
@@ -108,18 +129,18 @@ function jumpToScreenshot(stage, index) {
       <div class="table-split wide-only">
         <div class="table-scroll table-half">
           <el-table :data="leftItems" stripe border size="small">
-            <el-table-column prop="name" label="物品名" min-width="100" />
-            <el-table-column v-if="showColumns || isSingle" prop="category" label="分类" width="70" align="center" />
-            <el-table-column v-if="showColumns || isSingle" prop="ball" label="对应球" min-width="90" />
+            <el-table-column prop="name" label="物品名" :min-width="nameMinW" />
+            <el-table-column v-if="showColumns || isSingle" prop="category" label="分类" :width="catW" align="center" />
+            <el-table-column v-if="showColumns || isSingle" prop="ball" label="对应球" :min-width="ballMinW" />
             <template v-if="isSingle">
-              <el-table-column label="数量" width="100" align="right">
+              <el-table-column label="数量" :width="qtyW" align="right">
                 <template #default="{ row }">{{ row.before ?? row.after ?? 0 }}</template>
               </el-table-column>
             </template>
             <template v-else>
-              <el-table-column prop="before" label="跑图前" width="80" align="right" />
-              <el-table-column prop="after" label="跑图后" width="80" align="right" />
-              <el-table-column label="增量" width="80" align="right">
+              <el-table-column prop="before" label="跑图前" :width="stageW" align="right" />
+              <el-table-column prop="after" label="跑图后" :width="stageW" align="right" />
+              <el-table-column label="增量" :width="stageW" align="right">
                 <template #default="{ row }">
                   <span :class="deltaClass(row.delta)">{{ formatDelta(row.delta) }}</span>
                 </template>
@@ -129,18 +150,18 @@ function jumpToScreenshot(stage, index) {
         </div>
         <div class="table-scroll table-half">
           <el-table :data="rightItems" stripe border size="small">
-            <el-table-column prop="name" label="物品名" min-width="100" />
-            <el-table-column v-if="showColumns || isSingle" prop="category" label="分类" width="70" align="center" />
-            <el-table-column v-if="showColumns || isSingle" prop="ball" label="对应球" min-width="90" />
+            <el-table-column prop="name" label="物品名" :min-width="nameMinW" />
+            <el-table-column v-if="showColumns || isSingle" prop="category" label="分类" :width="catW" align="center" />
+            <el-table-column v-if="showColumns || isSingle" prop="ball" label="对应球" :min-width="ballMinW" />
             <template v-if="isSingle">
-              <el-table-column label="数量" width="100" align="right">
+              <el-table-column label="数量" :width="qtyW" align="right">
                 <template #default="{ row }">{{ row.before ?? row.after ?? 0 }}</template>
               </el-table-column>
             </template>
             <template v-else>
-              <el-table-column prop="before" label="跑图前" width="80" align="right" />
-              <el-table-column prop="after" label="跑图后" width="80" align="right" />
-              <el-table-column label="增量" width="80" align="right">
+              <el-table-column prop="before" label="跑图前" :width="stageW" align="right" />
+              <el-table-column prop="after" label="跑图后" :width="stageW" align="right" />
+              <el-table-column label="增量" :width="stageW" align="right">
                 <template #default="{ row }">
                   <span :class="deltaClass(row.delta)">{{ formatDelta(row.delta) }}</span>
                 </template>
@@ -152,18 +173,18 @@ function jumpToScreenshot(stage, index) {
       <!-- 窄屏单栏 -->
       <div class="table-scroll narrow-only">
         <el-table :data="delta.itemDeltas" stripe border size="small">
-          <el-table-column prop="name" label="物品名" min-width="100" />
-          <el-table-column v-if="showColumns || isSingle" prop="category" label="分类" width="70" align="center" />
-          <el-table-column v-if="showColumns || isSingle" prop="ball" label="对应球" min-width="90" />
+          <el-table-column prop="name" label="物品名" :min-width="nameMinW" />
+          <el-table-column v-if="showColumns || isSingle" prop="category" label="分类" :width="catW" align="center" />
+          <el-table-column v-if="showColumns || isSingle" prop="ball" label="对应球" :min-width="ballMinW" />
           <template v-if="isSingle">
-            <el-table-column label="数量" width="100" align="right">
+            <el-table-column label="数量" :width="qtyW" align="right">
               <template #default="{ row }">{{ row.before ?? row.after ?? 0 }}</template>
             </el-table-column>
           </template>
           <template v-else>
-            <el-table-column prop="before" label="跑图前" width="80" align="right" />
-            <el-table-column prop="after" label="跑图后" width="80" align="right" />
-            <el-table-column label="增量" width="80" align="right">
+            <el-table-column prop="before" label="跑图前" :width="stageW" align="right" />
+            <el-table-column prop="after" label="跑图后" :width="stageW" align="right" />
+            <el-table-column label="增量" :width="stageW" align="right">
               <template #default="{ row }">
                 <span :class="deltaClass(row.delta)">{{ formatDelta(row.delta) }}</span>
               </template>

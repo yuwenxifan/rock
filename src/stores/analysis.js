@@ -30,6 +30,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   const progressStep = ref('')
   const progressPercent = ref(0)
   const persistenceOk = ref(true)
+  const configItems = ref(null)
 
   const canAnalyze = computed(
     () => (beforeImages.value.length > 0 || afterImages.value.length > 0) && !analyzing.value,
@@ -119,6 +120,11 @@ export const useAnalysisStore = defineStore('analysis', () => {
       if (!result.blocked) {
         delta.value = result.delta
       }
+
+      try {
+        const config = await loadConfig()
+        configItems.value = config.items
+      } catch { /* config 加载失败不影响分析结果，delta 计算在 _revalidateResult 中守卫 */ }
 
       persistMeta()
     } catch (e) {
@@ -242,9 +248,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
     result.warnings = [...(result.warnings?.filter((w) => !w.includes('重复匹配')) || []), ...warnings]
     result.conflictDetails = conflictDetails
 
-    if (beforeResult.value?.totals && afterResult.value?.totals) {
-      const config = await loadConfig()
-      delta.value = computeDelta(beforeResult.value.totals, afterResult.value.totals, config.items)
+    if (beforeResult.value?.totals && afterResult.value?.totals && configItems.value) {
+      delta.value = computeDelta(beforeResult.value.totals, afterResult.value.totals, configItems.value)
     }
 
     const allWarnings = []

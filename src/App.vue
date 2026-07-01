@@ -12,9 +12,25 @@ const activeBeforeIndex = ref(0)
 const activeAfterIndex = ref(0)
 const activeTab = ref('result')
 
-const showDebugTab = computed(() => {
-  try { return localStorage.getItem('rock_debug') === '1' } catch { return false }
-})
+const debugEnabled = ref(false)
+try { debugEnabled.value = localStorage.getItem('rock_debug') === '1' } catch {}
+
+const showDebugTab = computed(() => debugEnabled.value)
+
+const debugClicks = ref(0)
+let debugClickTimer = null
+
+function onWorldClick() {
+  debugClicks.value++
+  clearTimeout(debugClickTimer)
+  if (debugClicks.value >= 15) {
+    debugEnabled.value = !debugEnabled.value
+    try { localStorage.setItem('rock_debug', debugEnabled.value ? '1' : '0') } catch {}
+    debugClicks.value = 0
+  } else {
+    debugClickTimer = setTimeout(() => { debugClicks.value = 0 }, 2000)
+  }
+}
 
 onMounted(async () => {
   await store.restoreFromStorage()
@@ -51,7 +67,7 @@ const warnDialog = ref(false)
 <template>
   <div class="app">
     <header class="header">
-      <h1>洛克王国世界 · 背包截图采集统计</h1>
+      <h1>洛克王国<span class="debug-trigger" @click="onWorldClick">世界</span> · 背包截图采集统计</h1>
       <p class="subtitle">上传跑图前/后背包截图，自动识别材料增量</p>
     </header>
 
@@ -222,6 +238,11 @@ body {
 .header h1 {
   margin: 0 0 4px;
   font-size: 20px;
+}
+
+.debug-trigger {
+  cursor: default;
+  user-select: none;
 }
 
 .subtitle {
