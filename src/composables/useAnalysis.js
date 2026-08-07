@@ -36,7 +36,7 @@ async function analyzeScreenshot(file, screenshotIndex, refHashes, settings, ite
         ocrDebug: _debug || null,
         warnings: [],
         skipped: false,
-        hasMarker: cell.hasMarker,
+        hasMarker: matchResult.hasMarker,
         maskPreview,
         _candidates: matchResult.candidates,
         status: 'ignored',
@@ -76,7 +76,7 @@ async function analyzeScreenshot(file, screenshotIndex, refHashes, settings, ite
       histDistance: matchResult.distance,
       warnings,
       skipped: false,
-      hasMarker: cell.hasMarker,
+      hasMarker: matchResult.hasMarker,
       maskPreview,
       status: quantity != null ? 'success' : 'failed',
     })
@@ -122,6 +122,8 @@ function fillGapCells(cellResults, screenshotIndex, stageLabel) {
 
   for (const cell of cellResults) {
     if (cell.status !== 'ignored' || cell.skipped) continue
+    // 左上角无绿色角标的格子不做兜底填充（hasMarker 已在 matchCellIcon 中算好，直接复用）
+    if (!cell.hasMarker) continue
     const candidates = cell._candidates
     if (!candidates || candidates.length === 0) continue
 

@@ -260,7 +260,7 @@ function checkCornerMarkerPresence(iconImageData, settings) {
 export function matchCellIcon(iconImageData, refHashes, settings = {}) {
   // ── 角标检测：在遮罩前检查左上角是否有绿色角标 ──
   const { hasMarker: hasCornerMarker } = checkCornerMarkerPresence(iconImageData, settings)
-  // 缺角标的格子可能定位偏移，最终置信度扣 20%
+  // 非绿色角标的格子，最终置信度扣 10%
   const cornerPenalty = hasCornerMarker ? 0 : 0.10
 
   // ── 预处理 ──
@@ -334,6 +334,8 @@ export function matchCellIcon(iconImageData, refHashes, settings = {}) {
     })),
     distance,
     ambiguous,
+    // 左上角是否绿色角标（checkCornerMarkerPresence 结果，供兜底填充等复用，避免重复检测）
+    hasMarker: hasCornerMarker,
     // 调试信息
     _debug: candidates.length > 0 ? {
       best: candidates[0].name,
